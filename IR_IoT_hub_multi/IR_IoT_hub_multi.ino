@@ -24,12 +24,12 @@
 #define SUB_TOPIC "home/ircmd"
 #define HUB_NAME  "IRHUB01" // Each device should have a unique name
 
-// Pin assignments
-#define IR_SENSOR_PIN     23
-#define LED_IR_PIN        32
-#define LED_SEND_PIN      33
-#define LED_RECV_PIN      22
-#define WIFI_CONNECT_LED  21
+// Pin assignments                proto   PCB
+#define IR_SENSOR_PIN     23  //   23     39
+#define LED_IR_PIN        32  //   32     35
+#define LED_SEND_PIN      33  //   33     32
+#define LED_RECV_PIN      22  //   22     41
+#define WIFI_CONNECT_LED  21  //   21     42
 #define USE_ACTIVE_LOW_OUTPUT_FOR_SEND_PIN
 
 #define WIFI_MAX_TRIES    12
