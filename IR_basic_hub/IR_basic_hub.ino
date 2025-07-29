@@ -67,8 +67,8 @@ void loop() {
   }
 
   // ----- SEND IR SIGNAL -----------------------------------------------------
-  Serial.println("Sending signal");
-  IrSender.sendNEC(0x1, 0x0, 1);
-  delay(2000);
+  // Serial.println("Sending signal");
+  // IrSender.sendNEC(0x1, 0x0, 1);
+  // delay(2000);
 
 }

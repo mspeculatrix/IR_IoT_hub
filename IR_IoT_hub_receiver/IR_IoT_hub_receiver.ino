@@ -24,7 +24,7 @@
 
 // Pin assignments
 #define IR_SENSOR_PIN      5  // D1
-#define LED_PIN           14  // D5
+#define LED_PIN            2  // D4
 // #define USE_ACTIVE_LOW_OUTPUT_FOR_SEND_PIN
 
 #define WIFI_MAX_TRIES    12
@@ -130,7 +130,7 @@ uint8_t wifiConnect() {
 void setup() {
   uint8_t error = 0;
   delay(1000);
-  Serial.begin(9600);
+  Serial.begin(115200);
 
   pinMode(LED_PIN, OUTPUT);
 

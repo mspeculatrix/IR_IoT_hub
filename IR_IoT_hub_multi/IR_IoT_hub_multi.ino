@@ -20,16 +20,21 @@
 #include <MQTTconfig.h>
 #include <WifiConfig.h>
 
+#define DEBUG true
+
 #define PUB_TOPIC "home/irrem"
 #define SUB_TOPIC "home/ircmd"
 #define HUB_NAME  "IRHUB01" // Each device should have a unique name
 
-// Pin assignments                proto   PCB
-#define IR_SENSOR_PIN     23  //   23     39
-#define LED_IR_PIN        32  //   32     35
-#define LED_SEND_PIN      33  //   33     32
-#define LED_RECV_PIN      22  //   22     41
-#define WIFI_CONNECT_LED  21  //   21     42
+// PIN ASSIGNMENTS
+// I have two versions of the hardware - a prototype hacked together
+// on proto board and a PCB version
+//                                proto     PCB
+#define IR_SENSOR_PIN     23  //   23     39 / D22
+#define LED_IR_PIN        32  //   32     12 / D32
+#define LED_SEND_PIN      33  //   33     13 / D33
+#define LED_RECV_PIN      22  //   22     41 / D1
+#define WIFI_CONNECT_LED  21  //   21     42 / D21
 #define USE_ACTIVE_LOW_OUTPUT_FOR_SEND_PIN
 
 #define WIFI_MAX_TRIES    12
@@ -50,7 +55,7 @@ char mqtt_msg[20];
 
 typedef struct {
   char hub_name[HUBNAME_LENGTH + 1];  // Add one for terminator
-  int  data[MSG_DATA_ITEMS];
+  uint16_t  data[MSG_DATA_ITEMS];
 } msgIn;
 
 typedef enum {
@@ -114,23 +119,26 @@ void mqttSubCallback(char* data, uint16_t len) {
     msgIn msg;
     parseMQTTmessage(data, &msg);
 
-    Serial.print(msg.hub_name); Serial.print(" >> ");
-    for (uint8_t i = 0; i < MSG_DATA_ITEMS; i++) {
-      Serial.print(msg.data[i]);
-      Serial.print(" ");
+    if(DEBUG) {
+      Serial.print(msg.hub_name); Serial.print(" >> ");
+      for (uint8_t i = 0; i < MSG_DATA_ITEMS; i++) {
+        Serial.print(msg.data[i]);
+        Serial.print(" ");
+      }
+      Serial.println();
+      Serial.print("Sending signal");
     }
-    Serial.println();
 
     // Send the received data as an IR signal. This section probably
     // needs expanding to cope with a wider variety of signals.
-    Serial.println("Sending signal");
     switch (msg.data[PROTO]) {
       case NEC:
-        IrSender.sendNEC(msg.data[ADDR], msg.data[CMD], 8);
-        flashLED(LED_SEND_PIN, 2);              // flash to confirm
+        IrSender.sendNEC(msg.data[ADDR], msg.data[CMD], 1);
+        // IrSender.sendNEC(1, 0, 1);         // FOR TESTING
         break;
     }
-    Serial.println("Signal sent");
+    if(DEBUG) Serial.println(" - sent");
+    flashLED(LED_SEND_PIN, 2);              // flash to confirm
   }
 }
 
@@ -170,7 +178,7 @@ bool parseMQTTmessage(char* data, msgIn* msg) {
         success = false;
         break;
       }
-      msg->data[item_count - 1] = (int)val;   // cast to int
+      msg->data[item_count - 1] = (uint16_t)val;   // cast to int
     } else {
       success = false;                        // Too many items
       break;
@@ -189,7 +197,10 @@ uint8_t wifiConnect() {
   uint8_t ssid_idx = 0;
   uint8_t connect_counter = 0;
   while (connect_counter < WIFI_MAX_TRIES) {
-    Serial.print("Trying to connect to "); Serial.println(ssid[ssid_idx]);
+    if(DEBUG) {
+      Serial.print("Trying to connect to "); 
+      Serial.println(ssid[ssid_idx]);
+    }
     WiFi.begin(ssid[ssid_idx], WIFI_PASSWORD);  // try to connect
     // delay to allow time for connection
     flashLED(WIFI_CONNECT_LED, 10, 250);
@@ -198,11 +209,14 @@ uint8_t wifiConnect() {
     if (wifi_status != WL_CONNECTED) {
       ssid_idx = 1 - ssid_idx;    // swap APs
     } else {
-      Serial.println("Connected!");
       connect_counter = WIFI_MAX_TRIES; // to break out of the loop
       ip = WiFi.localIP();
-      Serial.print("IP: "); Serial.println(ip);
       server_errors = 0;
+      if(DEBUG) {
+        Serial.print("Connected!");
+        Serial.print(" IP: "); 
+        Serial.println(ip);
+      }
     }
   }
   if (wifi_status != WL_CONNECTED) {  // wifi connection failed
@@ -218,22 +232,26 @@ uint8_t wifiConnect() {
 void processIRsignals(void* parameter) {
   while (1) {
     if (IrReceiver.decode()) {
-      if (IrReceiver.decodedIRData.decodedRawData != 0) {
+      if (
+        IrReceiver.decodedIRData.protocol != 0 &&
+        IrReceiver.decodedIRData.decodedRawData != 0xFFFFFFFF) 
+      {
         flashLED(LED_RECV_PIN, 1);
-        Serial.println("-----------------------");
-        IrReceiver.printIRResultShort(&Serial);
-        IrReceiver.printIRSendUsage(&Serial);
-        Serial.print("Proto: ");
-        Serial.print(IrReceiver.decodedIRData.protocol);
-        Serial.print("  +  Addr: ");
-        Serial.print(IrReceiver.decodedIRData.address);
-        Serial.print("  +  Cmd: ");
-        Serial.print(IrReceiver.decodedIRData.command);
-        Serial.print("  +  Flags: ");
-        Serial.print(IrReceiver.decodedIRData.flags);
-        Serial.print("  +  Raw data: ");
-        Serial.println(IrReceiver.decodedIRData.decodedRawData, HEX);
-        // IrReceiver.printIRResultRawFormatted(&Serial, true);
+        if(DEBUG) {
+          Serial.println("-----------------------");
+          IrReceiver.printIRResultShort(&Serial);
+          IrReceiver.printIRSendUsage(&Serial);
+          Serial.print("Proto: ");
+          Serial.print(IrReceiver.decodedIRData.protocol);
+          Serial.print("  +  Addr: ");
+          Serial.print(IrReceiver.decodedIRData.address);
+          Serial.print("  +  Cmd: ");
+          Serial.print(IrReceiver.decodedIRData.command);
+          Serial.print("  +  Flags: ");
+          Serial.print(IrReceiver.decodedIRData.flags);
+          Serial.print("  +  Raw data: ");
+          Serial.println(IrReceiver.decodedIRData.decodedRawData, HEX);
+        }
         char msgFmt[] = "%s_%i_%i_%i_%i";
         sprintf(mqtt_msg, msgFmt,
           HUB_NAME,
@@ -277,15 +295,18 @@ void setup() {
   uint8_t error = 0;
   delay(1000);
   Serial.begin(115200);
-  //  pinMode(LED_IR_PIN, OUTPUT);
+
   pinMode(LED_SEND_PIN, OUTPUT);
   pinMode(LED_RECV_PIN, OUTPUT);
   pinMode(WIFI_CONNECT_LED, OUTPUT);
 
-  Serial.println(F("\n\n\n+--------------+"));
-  Serial.println(F("|  ESP IR HUB  |"));
-  Serial.println(F("+--------------+"));
-  Serial.println(F("\nConnecting to wifi"));
+  if(DEBUG) {
+    Serial.println(F("\n\n\n+--------------+"));
+    Serial.println(F("|  ESP IR HUB  |"));
+    Serial.println(F("+--------------+"));
+    Serial.println(F("\nConnecting to wifi"));
+  }
+
   error = wifiConnect();
 
   if (error == 0) {
@@ -303,7 +324,7 @@ void setup() {
     // Set up Core 0 task handler
     xTaskCreatePinnedToCore(
       processIRsignals,                 // task code
-      "Core0 process IR signals",       // name
+      "Process IR signals",             // name
       10000,                            // stack depth
       NULL,                             // pvParameters
       0,                                // priority - 1 didn't work
@@ -314,15 +335,15 @@ void setup() {
     // Set up Core 1 task handler
     xTaskCreatePinnedToCore(
       processNetworkCommands,           // task code
-      "Core1 process net commands",     // name
-      10000,                            // stack depth - crashes at 50000. At 60000 just stops working
+      "Process net commands",           // name
+      10000,                            // stack depth
       NULL,                             // pvParameters
       1,                                // priority
       &Core1Task,                       // CreatedTask
       1                                 // CoreID
     );
 
-    Serial.println(F("\nRUNNING...\n"));
+    if(DEBUG) Serial.println(F("\nRUNNING...\n"));
   } else {
     while (1) {                        // There was an error. Loop endlessly
       flashLED(LED_SEND_PIN, 2);      // Flash lights in a desperate

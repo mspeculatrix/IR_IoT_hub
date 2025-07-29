@@ -1,14 +1,14 @@
 /******************************************************************************
  *
- *  IR_IoT_hub
+ *  IR_IoT_hub_ESP32. Needs an ESP32 with 2 cores.
  *
  *  Receives IR commands from a remote and sends associated messages out over
  *  MQTT.
  *
- *  Also watches for MQTT messages and sends out corresponding IR signals.
+ *  Also listens for commands coming over the net as MQTT messages and sends
+ *  out associated IR signals.
  *
- *  Has a slight issue in that the two functions briefly block each other.
- *  Use board: ESP32 Dev Module
+ *  Using board config: ESP32 Dev Module
  *
  *****************************************************************************/
 
@@ -20,9 +20,12 @@
 #include <MQTTconfig.h>
 #include <WifiConfig.h>
 
+#define USE_MULTITASKING // Comment out for non-multitasking version
+#define DEBUG true
+
 #define PUB_TOPIC "home/irrem"
 #define SUB_TOPIC "home/ircmd"
-#define HUB_NAME "IRHUB01" // Each device should have a unique name
+#define HUB_NAME  "IRHUB01" // Each device should have a unique name
 
 // PIN ASSIGNMENTS
 // I have two versions of the hardware - a prototype hacked together
@@ -35,22 +38,27 @@
 #define WIFI_CONNECT_LED  21  //   21     42 / D21
 #define USE_ACTIVE_LOW_OUTPUT_FOR_SEND_PIN
 
-#define WIFI_MAX_TRIES   12
-#define ERR_WIFI_CONNECT  1    // Not doing much with error codes yet. One day.
+#define WIFI_MAX_TRIES    12
+#define ERR_WIFI_CONNECT   1
 
-#define HUBNAME_LENGTH    7
-#define MSG_DATA_ITEMS    4
+#define HUBNAME_LENGTH     7
+#define MSG_DATA_ITEMS     4
 
 /******************************************************************************
  ***  GLOBALS                                                               ***
  *****************************************************************************/
 
+#ifdef USE_MULTITASKING
+TaskHandle_t Core0Task;
+TaskHandle_t Core1Task;
+#endif
+
 WiFiClient mqttWifiClient;
 char mqtt_msg[20];
 
 typedef struct {
-  char hub_name[HUBNAME_LENGTH + 1];            // Add one for terminator
-  int  data[MSG_DATA_ITEMS];
+  char hub_name[HUBNAME_LENGTH + 1];  // Add one for terminator
+  uint16_t  data[MSG_DATA_ITEMS];
 } msgIn;
 
 typedef enum {
@@ -59,6 +67,7 @@ typedef enum {
   CMD,
   FLAGS
 } data_field_t;
+
 
 // --- MQTT CLIENT ------------------------------------------------------------
 // Create an MQTT_Client class to connect to the MQTT server.
@@ -76,7 +85,6 @@ uint8_t server_errors = 0;
  ***  FUNCTIONS                                                             ***
  *****************************************************************************/
 
- // Just for a bit of blinkenlight bling.
 void flashLED(uint8_t led, uint8_t times, int pulseLen = 100) {
   for (uint8_t i = 0; i < times; i++) {
     digitalWrite(led, HIGH);
@@ -89,11 +97,12 @@ void flashLED(uint8_t led, uint8_t times, int pulseLen = 100) {
 // ----------------------------------------------------------------------------
 // --- MQTT FUNCTIONS                                                       ---
 // ----------------------------------------------------------------------------
+
 // Function to connect and reconnect as necessary to the MQTT server.
 // Should be called in the loop function and it will take care of connecting.
 void MQTT_connect() {
-  if (mqtt.connected()) {
-    return;                               // do nothing if already connected
+  if (mqtt.connected()) {                 // do nothing if already connected.
+    return;
   }
   int8_t ret;
   uint8_t retries = 3;
@@ -111,8 +120,7 @@ void MQTT_connect() {
 void mqttSubCallback(char* data, uint16_t len) {
   if (len > 0) {
     msgIn msg;
-    bool msgParsedOK = parseMQTTmessage(data, &msg);
-    if (!msgParsedOK) Serial.println("*** Parsing issue ***");
+    parseMQTTmessage(data, &msg);
 
     if(DEBUG) {
       Serial.print(msg.hub_name); Serial.print(" >> ");
@@ -129,6 +137,7 @@ void mqttSubCallback(char* data, uint16_t len) {
     switch (msg.data[PROTO]) {
       case NEC:
         IrSender.sendNEC(msg.data[ADDR], msg.data[CMD], 1);
+        // IrSender.sendNEC(1, 0, 1);         // FOR TESTING
         break;
     }
     if(DEBUG) Serial.println(" - sent");
@@ -219,6 +228,71 @@ uint8_t wifiConnect() {
   return error;
 }
 
+#ifdef USE_MULTITASKING
+/******************************************************************************
+ ***  CORE 0 FUNCTION - process IR signals                                  ***
+ *****************************************************************************/
+
+void processIRsignals(void* parameter) {
+  while (1) {
+    if (IrReceiver.decode()) {
+      if (
+        IrReceiver.decodedIRData.protocol != 0 &&
+        IrReceiver.decodedIRData.decodedRawData != 0xFFFFFFFF) 
+      {
+        flashLED(LED_RECV_PIN, 1);
+        if(DEBUG) {
+          Serial.println("-----------------------");
+          IrReceiver.printIRResultShort(&Serial);
+          IrReceiver.printIRSendUsage(&Serial);
+          Serial.print("Proto: ");
+          Serial.print(IrReceiver.decodedIRData.protocol);
+          Serial.print("  +  Addr: ");
+          Serial.print(IrReceiver.decodedIRData.address);
+          Serial.print("  +  Cmd: ");
+          Serial.print(IrReceiver.decodedIRData.command);
+          Serial.print("  +  Flags: ");
+          Serial.print(IrReceiver.decodedIRData.flags);
+          Serial.print("  +  Raw data: ");
+          Serial.println(IrReceiver.decodedIRData.decodedRawData, HEX);
+        }
+        char msgFmt[] = "%s_%i_%i_%i_%i";
+        sprintf(mqtt_msg, msgFmt,
+          HUB_NAME,
+          IrReceiver.decodedIRData.protocol,
+          IrReceiver.decodedIRData.address,
+          IrReceiver.decodedIRData.command,
+          IrReceiver.decodedIRData.flags);
+        mqtt_pub.publish(mqtt_msg);
+      }
+      IrReceiver.resume();
+    }
+  }
+  delay(20);                                  // Let the other CPU have a go
+}
+
+/******************************************************************************
+ ***  CORE 1 FUNCTION - process MQTT-based commands                         ***
+ *****************************************************************************/
+
+void processNetworkCommands(void* parameter) {
+  while (1) {
+    // Ensure the connection to the MQTT server is alive (this will make the
+    // first connection and automatically reconnect when disconnected).  See
+    // the MQTT_connect function definition above.
+    MQTT_connect();
+
+    mqtt.processPackets(10000); // waits 10 secs
+
+    // Ping the server to keep the mqtt connection alive
+    // NOT required if you are publishing once every KEEPALIVE seconds
+    if (!mqtt.ping()) {
+      mqtt.disconnect();
+    }
+  }
+}
+#endif
+
 /******************************************************************************
  ***  SETUP                                                                 ***
  *****************************************************************************/
@@ -244,19 +318,43 @@ void setup() {
     IrReceiver.begin(IR_SENSOR_PIN, ENABLE_LED_FEEDBACK); // Start the receiver
     IrSender.begin(LED_IR_PIN);
 
-    flashLED(LED_SEND_PIN, 2);                            // Show we're alive
+    flashLED(LED_SEND_PIN, 2);  // Just to show we're alive
     flashLED(LED_RECV_PIN, 2);
     flashLED(WIFI_CONNECT_LED, 2);
 
     // START MQTT SUBSCRIPTION
     mqtt.subscribe(&mqtt_sub);
     mqtt_sub.setCallback(mqttSubCallback);
-    if(DEBUG) Serial.println(F("\nRUNNING...\n"));
 
+#ifdef USE_MULTITASKING
+    // Set up Core 0 task handler
+    xTaskCreatePinnedToCore(
+      processIRsignals,                 // task code
+      "Process IR signals",             // name
+      10000,                            // stack depth
+      NULL,                             // pvParameters
+      0,                                // priority - 1 didn't work
+      &Core0Task,                       // CreatedTask
+      0                                 // CoreID
+    );
+
+    // Set up Core 1 task handler
+    xTaskCreatePinnedToCore(
+      processNetworkCommands,           // task code
+      "Process net commands",           // name
+      10000,                            // stack depth
+      NULL,                             // pvParameters
+      1,                                // priority
+      &Core1Task,                       // CreatedTask
+      1                                 // CoreID
+    );
+#endif
+
+    if(DEBUG) Serial.println(F("\nRUNNING...\n"));
   } else {
-    while (1) {
-      flashLED(LED_SEND_PIN, 2);            // Flash lights in a desperate
-      flashLED(LED_RECV_PIN, 2);            // attempt to get attention
+    while (1) {                       // There was an error. Loop endlessly
+      flashLED(LED_SEND_PIN, 2);      // Flash lights in a desperate
+      flashLED(LED_RECV_PIN, 2);      // bid for attention
       flashLED(WIFI_CONNECT_LED, 2);
       delay(500);
     }
@@ -264,10 +362,11 @@ void setup() {
 }
 
 /******************************************************************************
- ***  LOOP                                                                  ***
+ ***  LOOP - not used because we can haz multitasking                       ***
  *****************************************************************************/
 
 void loop() {
+#ifndef USE_MULTITASKING
   // Ensure the connection to the MQTT server is alive (this will make the
   // first connection and automatically reconnect when disconnected).
   // See the MQTT_connect function definition above.
@@ -309,5 +408,5 @@ void loop() {
   if (!mqtt.ping()) {
     mqtt.disconnect();
   }
-
+#endif
 }
