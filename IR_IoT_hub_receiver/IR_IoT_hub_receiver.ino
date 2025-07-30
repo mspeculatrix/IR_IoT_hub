@@ -19,26 +19,47 @@
 
 #define DEBUG true
 
-#define PUB_TOPIC "home/irrem"
-#define HUB_NAME "IRREC01" // Each device should have a unique name
+#define HUB_NAME "IRREC"
+#define DEVICE_ID 1
 
 // Pin assignments
 #define IR_SENSOR_PIN      5  // D1
 #define LED_PIN            2  // D4
 // #define USE_ACTIVE_LOW_OUTPUT_FOR_SEND_PIN
 
-#define WIFI_MAX_TRIES    12
-#define ERR_WIFI_CONNECT   1    // Not doing much with error codes yet. One day.
+/* ----- COMMON STUFF ------------------------------------------------------- */
 
-#define HUBNAME_LENGTH     7
-#define MSG_DATA_ITEMS     4
+#define PUB_TOPIC "home/irrem"
+#define SUB_TOPIC "home/ircmd"
+
+#define WIFI_MAX_TRIES    12
+#define ERR_WIFI_CONNECT   1
+
+#define HUBNAME_LENGTH     5
+#define MSG_DATA_ITEMS     5
+
+typedef struct { 		// for MQTT message data
+  char hub_name[HUBNAME_LENGTH + 1];  // Add one for terminator
+  uint16_t  data[MSG_DATA_ITEMS];
+} msgIn;
+
+typedef enum {			// labels for decoded MQTT message data
+  DEVID,
+  PROTO,
+  ADDR,
+  CMD,
+  FLAGS
+} data_field_t;
+
+char mqtt_msg[25];
+
+/* -------------------------------------------------------------------------- */
 
 /******************************************************************************
  ***  GLOBALS                                                               ***
  *****************************************************************************/
 
 WiFiClient mqttWifiClient;
-char mqtt_msg[20];
 
 // --- MQTT CLIENT ------------------------------------------------------------
 // Create an MQTT_Client class to connect to the MQTT server.
@@ -55,7 +76,7 @@ uint8_t server_errors = 0;
  ***  FUNCTIONS                                                             ***
  *****************************************************************************/
 
- // Just for a bit of blinkenlight bling.
+ // Because blinkenlights are essential
 void flashLED(uint8_t led, uint8_t times, int pulseLen = 100) {
   for (uint8_t i = 0; i < times; i++) {
     digitalWrite(led, HIGH);
@@ -182,8 +203,9 @@ void loop() {
         Serial.print(IrReceiver.decodedIRData.flags);
         Serial.print("  +  Raw data: ");
         Serial.println(IrReceiver.decodedIRData.decodedRawData, HEX);
-        sprintf(mqtt_msg, "%s_%i_%i_%i_%i",
+        sprintf(mqtt_msg, "%s_%u_%u_%u_%u_%u",
           HUB_NAME,
+          DEVICE_ID,
           IrReceiver.decodedIRData.protocol,
           IrReceiver.decodedIRData.address,
           IrReceiver.decodedIRData.command,

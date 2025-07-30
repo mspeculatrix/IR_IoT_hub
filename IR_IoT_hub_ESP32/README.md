@@ -1,14 +1,20 @@
 # IR_IoT_hub_ESP32
 
-This is based on the `IR_IoT_hub` version and is the code I'm currently working on. It has the option of using multitasking by running the receiver functionality on one core and the sender on the other.
+This is the code I'm currently working on. It has the option of using multitasking by running the receiver functionality on one core and the sender on the other.
 
 You use `#define USE_MULTITASKING` at the beginning to decide whether the multitasking or non-multitasking version is compiled. Comment-out that line to get the non-multitasking version.
 
+The non-multitasking version is working.
+
 ## ISSUES
 
-**Not currently working.**
+**Multitasking version not currently working.**
 
-I don't think it's sending a properly formed IR signal even though most of the functions are identical to `IR_IoT_hub` which is working fine (so this is not a hardware problem).
+It receives and interprets IR signals fine. Also handled MQTT messages (incoming and outgoing) without problem.
+
+The issue is with sending IR signals.
+
+I don't think it's sending a properly formed IR signal.
 
 When an IR signal is sent, it also gets read by the sensor. And the latter reports a completely different signal to the one I'm trying to send. Often the raw data is 0xFFFFFFFF or something very close (sometimes one of those Fs is an E) and on those occasions the program crashes.
 
@@ -31,4 +37,4 @@ Guru Meditation Error: Core  0 panic'ed (InstrFetchProhibited). Exception was un
 
 ```
 
-I'm assuming the crash is because the values coming back from the sensor somehow can't be handled by the Core 0 process. But I think the problem is the sender sending a wrong or malformed signal.
+I'm assuming occasional crashes happen because the values coming back from the sensor somehow can't be handled by the Core 0 process. But I think the problem is the sender sending a wrong or malformed signal.

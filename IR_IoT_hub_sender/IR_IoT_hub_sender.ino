@@ -16,38 +16,48 @@ Using ESP8266 board: NodeMCU 1.0.
 
 #define DEBUG true
 
-#define SUB_TOPIC "home/ircmd"
-#define HUB_NAME  "IRSND01" // Each device should have a unique name
+#define HUB_NAME  "IRSND" // Each device should have a unique name
+#define DEVICE_ID 3
 
 // Pin assignments
 #define LED_IR_PIN         4  // D2
 #define LED_PIN            2  // D4
 #define USE_ACTIVE_LOW_OUTPUT_FOR_SEND_PIN
 
+/* ----- COMMON STUFF ------------------------------------------------------- */
+
+#define PUB_TOPIC "home/irrem"
+#define SUB_TOPIC "home/ircmd"
+
 #define WIFI_MAX_TRIES    12
 #define ERR_WIFI_CONNECT   1
 
-#define HUBNAME_LENGTH     7
-#define MSG_DATA_ITEMS     4
+#define HUBNAME_LENGTH     5
+#define MSG_DATA_ITEMS     5
+
+typedef struct { 		// for MQTT message data
+  char hub_name[HUBNAME_LENGTH + 1];  // Add one for terminator
+  uint16_t  data[MSG_DATA_ITEMS];
+} msgIn;
+
+typedef enum {			// labels for decoded MQTT message data
+  DEVID,
+  PROTO,
+  ADDR,
+  CMD,
+  FLAGS
+} data_field_t;
+
+char mqtt_msg[25];
+
+/* -------------------------------------------------------------------------- */
+
 
 /******************************************************************************
  ***  GLOBALS                                                               ***
  *****************************************************************************/
 
 WiFiClient mqttWifiClient;
-char mqtt_msg[20];
-
-typedef struct {
-  char hub_name[HUBNAME_LENGTH + 1];  // Add one for terminator
-  int  data[MSG_DATA_ITEMS];
-} msgIn;
-
-typedef enum {
-  PROTO,
-  ADDR,
-  CMD,
-  FLAGS
-} data_field_t;
 
 // --- MQTT CLIENT ------------------------------------------------------------
 // Create an MQTT_Client class to connect to the MQTT server.
@@ -63,7 +73,7 @@ IPAddress ip;
  ***  FUNCTIONS                                                             ***
  *****************************************************************************/
 
- // Just for a bit of blinkenlight bling.
+ // Because blinkenlights are essential
 void flashLED(uint8_t led, uint8_t times, int pulseLen = 100) {
   for (uint8_t i = 0; i < times; i++) {
     digitalWrite(led, HIGH);
