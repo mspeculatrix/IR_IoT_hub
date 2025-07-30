@@ -28,14 +28,11 @@
 #define HUB_NAME  "IRHUB01" // Each device should have a unique name
 
 // PIN ASSIGNMENTS
-// I have two versions of the hardware - a prototype hacked together
-// on proto board and a PCB version
-//                                proto     PCB
-#define IR_SENSOR_PIN     23  //   23     39 / D22
-#define LED_IR_PIN        32  //   32     12 / D32
-#define LED_SEND_PIN      33  //   33     13 / D33
-#define LED_RECV_PIN      22  //   22     41 / D1
-#define WIFI_CONNECT_LED  21  //   21     42 / D21
+#define IR_SENSOR_PIN     23
+#define LED_IR_PIN        32
+#define LED_SEND_PIN      33
+#define LED_RECV_PIN      22
+#define WIFI_CONNECT_LED  21
 #define USE_ACTIVE_LOW_OUTPUT_FOR_SEND_PIN
 
 #define WIFI_MAX_TRIES    12
@@ -122,7 +119,7 @@ void mqttSubCallback(char* data, uint16_t len) {
     msgIn msg;
     parseMQTTmessage(data, &msg);
 
-    if(DEBUG) {
+    if (DEBUG) {
       Serial.print(msg.hub_name); Serial.print(" >> ");
       for (uint8_t i = 0; i < MSG_DATA_ITEMS; i++) {
         Serial.print(msg.data[i]);
@@ -140,7 +137,7 @@ void mqttSubCallback(char* data, uint16_t len) {
         // IrSender.sendNEC(1, 0, 1);         // FOR TESTING
         break;
     }
-    if(DEBUG) Serial.println(" - sent");
+    if (DEBUG) Serial.println(" - sent");
     flashLED(LED_SEND_PIN, 2);              // flash to confirm
   }
 }
@@ -200,8 +197,8 @@ uint8_t wifiConnect() {
   uint8_t ssid_idx = 0;
   uint8_t connect_counter = 0;
   while (connect_counter < WIFI_MAX_TRIES) {
-    if(DEBUG) {
-      Serial.print("Trying to connect to "); 
+    if (DEBUG) {
+      Serial.print("Trying to connect to ");
       Serial.println(ssid[ssid_idx]);
     }
     WiFi.begin(ssid[ssid_idx], WIFI_PASSWORD);  // try to connect
@@ -215,9 +212,9 @@ uint8_t wifiConnect() {
       connect_counter = WIFI_MAX_TRIES; // to break out of the loop
       ip = WiFi.localIP();
       server_errors = 0;
-      if(DEBUG) {
+      if (DEBUG) {
         Serial.print("Connected!");
-        Serial.print(" IP: "); 
+        Serial.print(" IP: ");
         Serial.println(ip);
       }
     }
@@ -238,10 +235,9 @@ void processIRsignals(void* parameter) {
     if (IrReceiver.decode()) {
       if (
         IrReceiver.decodedIRData.protocol != 0 &&
-        IrReceiver.decodedIRData.decodedRawData != 0xFFFFFFFF) 
-      {
+        IrReceiver.decodedIRData.decodedRawData != 0xFFFFFFFF) {
         flashLED(LED_RECV_PIN, 1);
-        if(DEBUG) {
+        if (DEBUG) {
           Serial.println("-----------------------");
           IrReceiver.printIRResultShort(&Serial);
           IrReceiver.printIRSendUsage(&Serial);
@@ -305,7 +301,7 @@ void setup() {
   pinMode(LED_RECV_PIN, OUTPUT);
   pinMode(WIFI_CONNECT_LED, OUTPUT);
 
-  if(DEBUG) {
+  if (DEBUG) {
     Serial.println(F("\n\n\n+--------------+"));
     Serial.println(F("|  ESP IR HUB  |"));
     Serial.println(F("+--------------+"));
@@ -327,7 +323,7 @@ void setup() {
     mqtt_sub.setCallback(mqttSubCallback);
 
 #ifdef USE_MULTITASKING
-    // Set up Core 0 task handler
+    // Set up Core 0 task
     xTaskCreatePinnedToCore(
       processIRsignals,                 // task code
       "Process IR signals",             // name
@@ -338,7 +334,7 @@ void setup() {
       0                                 // CoreID
     );
 
-    // Set up Core 1 task handler
+    // Set up Core 1 task
     xTaskCreatePinnedToCore(
       processNetworkCommands,           // task code
       "Process net commands",           // name
@@ -350,7 +346,8 @@ void setup() {
     );
 #endif
 
-    if(DEBUG) Serial.println(F("\nRUNNING...\n"));
+    if (DEBUG) Serial.println(F("\nRUNNING...\n"));
+
   } else {
     while (1) {                       // There was an error. Loop endlessly
       flashLED(LED_SEND_PIN, 2);      // Flash lights in a desperate
@@ -362,7 +359,7 @@ void setup() {
 }
 
 /******************************************************************************
- ***  LOOP - not used because we can haz multitasking                       ***
+ ***  LOOP - used only when not multitasking                                ***
  *****************************************************************************/
 
 void loop() {

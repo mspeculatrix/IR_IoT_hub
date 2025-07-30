@@ -1,16 +1,22 @@
 # IR_IoT_hub_ESP32
 
-This is a combination of the `IR_IoT_hub` and `IR_IoT_hub_multi` versions. It's the definitive version and means it's all in one codebase.
+This is based on the `IR_IoT_hub` version and is the code I'm currently working on. It has the option of using multitasking by running the receiver functionality on one core and the sender on the other.
 
-The code uses `#define USE_MULTITASKING` at the beginning to decide whether the multitasking or non-multitasking version is compiled. Comment-out that line to get the non-multitasking version.
+You use `#define USE_MULTITASKING` at the beginning to decide whether the multitasking or non-multitasking version is compiled. Comment-out that line to get the non-multitasking version.
 
 ## ISSUES
 
-I don't think it's sending a properly formed IR signal. When an IR signal is sent, it also gets read by the sensor. And the latter reports a completely different signal to the one I'm trying to send. Often the raw data is 0xFFFFFFFF or something very close (sometimes one of those Fs is an E). It will report a protocol of 0 or 9 when I was sending 8.
+**Not currently working.**
 
-I tried with a signal I know works (turning a lamp on/off) and it fails to work. Send the same MQTT message with the non-multitasking version of the code is fine. (It's not a hardware problem).
+I don't think it's sending a properly formed IR signal even though most of the functions are identical to `IR_IoT_hub` which is working fine (so this is not a hardware problem).
 
-From within the mqttSubCallback() function I tried sending a signal with contsant values - eg, `IrSender.sendNEC(1, 0, 5);` - but this has the same issues. _Seomthing_ is being sent, so `IrSender()` is running. But the signal is wrong. Some kind of scope issue using IrSender() inside this function.???
+When an IR signal is sent, it also gets read by the sensor. And the latter reports a completely different signal to the one I'm trying to send. Often the raw data is 0xFFFFFFFF or something very close (sometimes one of those Fs is an E) and on those occasions the program crashes.
+
+Other times it will report a protocol of 0 or 9 when I was sending 8.
+
+I tried with a signal I know works (turning a lamp on/off) and it fails to work.
+
+From within the mqttSubCallback() function I tried sending a signal with constant values - eg, `IrSender.sendNEC(1, 0, 5);` - but this has the same issues. _Something_ is being sent, so `IrSender()` is running. But the signal is wrong. Some kind of scope issue using IrSender() inside a core task.???
 
 Example of what happens:
 

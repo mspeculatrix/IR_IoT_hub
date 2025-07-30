@@ -1,6 +1,6 @@
 /*
 
-IR_basic_hub
+IR_IoT_hub_basic
 
 IR remote input/output
 
