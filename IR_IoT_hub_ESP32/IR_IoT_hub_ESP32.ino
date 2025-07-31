@@ -20,11 +20,11 @@
 #include <MQTTconfig.h>
 #include <WifiConfig.h>
 
-#define USE_MULTITASKING // Comment out for non-multitasking version
+#define USE_MULTITASKING     // Comment out for non-multitasking version
 #define DEBUG true
 
-#define HUB_NAME  "IRHUB"
-#define DEVICE_ID 0       // Each device should have a unique ID (uint16_t)
+#define DEVICE_TYPE "IRHUB"  // IRHUB, IRREC
+#define DEVICE_ID   10       // Each device should have a unique ID (uint16_t)
 
 // PIN ASSIGNMENTS
 #define IR_SENSOR_PIN     23
@@ -36,17 +36,17 @@
 
 /* ----- COMMON STUFF ------------------------------------------------------- */
 
-#define PUB_TOPIC "home/irrem"
+#define PUB_TOPIC "home/irrec"
 #define SUB_TOPIC "home/ircmd"
 
 #define WIFI_MAX_TRIES    12
 #define ERR_WIFI_CONNECT   1
 
-#define HUBNAME_LENGTH     5
+#define DEVTYPE_LEN        5
 #define MSG_DATA_ITEMS     5
 
 typedef struct { 		// for MQTT message data
-  char hub_name[HUBNAME_LENGTH + 1];  // Add one for terminator
+  char devtype[DEVTYPE_LEN + 1];  // Add one for terminator
   uint16_t  data[MSG_DATA_ITEMS];
 } msgIn;
 
@@ -128,7 +128,7 @@ void mqttSubCallback(char* data, uint16_t len) {
     parseMQTTmessage(data, &msg);
 
     if (DEBUG) {
-      Serial.print(msg.hub_name); Serial.print(" >> ");
+      Serial.print(msg.devtype); Serial.print(" >> ");
       for (uint8_t i = 0; i < MSG_DATA_ITEMS; i++) {
         Serial.print(msg.data[i]);
         Serial.print(" ");
@@ -156,7 +156,7 @@ void mqttSubCallback(char* data, uint16_t len) {
 bool parseMQTTmessage(char* data, msgIn* msg) {
   bool success = true;              // let's be optimistic
   // Check we actually have data and the string is not too short.
-  if (data == NULL || strlen(data) < HUBNAME_LENGTH + (MSG_DATA_ITEMS * 2)) {
+  if (data == NULL || strlen(data) < DEVTYPE_LEN + (MSG_DATA_ITEMS * 2)) {
     return false;
   }
   // Create a mutable copy of the input string because strtok
@@ -171,12 +171,12 @@ bool parseMQTTmessage(char* data, msgIn* msg) {
 
   while (token != NULL) {
     if (item_count == 0) {                    // First item: hubname string
-      if (strlen(token) != HUBNAME_LENGTH) {  // check it's the correct length
+      if (strlen(token) != DEVTYPE_LEN) {  // check it's the correct length
         success = false;
         break;
       }
-      strncpy(msg->hub_name, token, HUBNAME_LENGTH);
-      msg->hub_name[HUBNAME_LENGTH] = '\0';   // Ensure null termination
+      strncpy(msg->devtype, token, DEVTYPE_LEN);
+      msg->devtype[DEVTYPE_LEN] = '\0';   // Ensure null termination
     } else if (item_count >= 1 && item_count <= MSG_DATA_ITEMS) {
       // Remaining items: integer values
       char* endptr;
@@ -260,7 +260,7 @@ void checkIRdecode() {
       }
       char msgFmt[] = "%s_%u_%u_%u_%u_%u";
       sprintf(mqtt_msg, msgFmt,
-        HUB_NAME,
+        DEVICE_TYPE,
         DEVICE_ID,
         IrReceiver.decodedIRData.protocol,
         IrReceiver.decodedIRData.address,
