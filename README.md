@@ -24,7 +24,7 @@ When the hub receives an IR signal from a remote, it sends it out over the netwo
 
 The format of the message is:
 
-`<device_name>_<device_id>_<protocol>_<address>_<command>_<flags>`
+`<device_type>_<device_id>_<protocol>_<address>_<command>_<flags>`
 
 Here's an example:
 
@@ -32,7 +32,7 @@ Here's an example:
 
 The format is strict.
 
-- **device_name** - 5 chars
+- **device_type** - 5 chars
 - Five integer values (16-bit).
 
 ### IR networked sender
@@ -52,7 +52,7 @@ In my case, I have two access points at home with different names (SSIDs) but th
 
 ## RESOURCES
 
-- GitHub repo for this project: https://github.com/mspeculatrix/ESP32_IR_hub
+- GitHub repo for this project: https://github.com/mspeculatrix/IR_IoT_hub
 - IRremote library: https://github.com/Arduino-IRremote/Arduino-IRremote
 - Adafruit MQTT library: https://github.com/adafruit/Adafruit_MQTT_Library
 
