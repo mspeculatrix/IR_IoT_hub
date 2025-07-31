@@ -10,6 +10,8 @@
  *
  *  Using board config: ESP32 Dev Module
  *
+ *  See: 
+ *  https://learn.adafruit.com/mqtt-adafruit-io-and-you/intro-to-adafruit-mqtt
  *****************************************************************************/
 
 #include <WiFi.h>
@@ -23,8 +25,8 @@
 #define USE_MULTITASKING // Comment out for non-multitasking version
 #define DEBUG true
 
-#define HUB_NAME  "IRHUB"
-#define DEVICE_ID 0       // Each device should have a unique ID (uint16_t)
+#define DEVICE  "IRHUB"    // IRHUB, IRSND or IRREC
+#define DEVICE_ID 10       // Each device should have a unique ID (uint16_t)
 
 // PIN ASSIGNMENTS
 #define IR_SENSOR_PIN     23
@@ -36,17 +38,17 @@
 
 /* ----- COMMON STUFF ------------------------------------------------------- */
 
-#define PUB_TOPIC "home/irrem"
+#define PUB_TOPIC "home/irrec"
 #define SUB_TOPIC "home/ircmd"
 
 #define WIFI_MAX_TRIES    12
 #define ERR_WIFI_CONNECT   1
 
-#define HUBNAME_LENGTH     5
+#define DEVTYPE_LEN 5
 #define MSG_DATA_ITEMS     5
 
 typedef struct { 		// for MQTT message data
-  char hub_name[HUBNAME_LENGTH + 1];  // Add one for terminator
+  char device_type[DEVTYPE_LEN + 1];  // Add one for terminator
   uint16_t  data[MSG_DATA_ITEMS];
 } msgIn;
 
@@ -59,6 +61,8 @@ typedef enum {			// labels for decoded MQTT message data
 } data_field_t;
 
 char mqtt_msg[25];
+msgIn last_msg;
+bool new_msg = false;
 
 /* -------------------------------------------------------------------------- */
 
@@ -90,7 +94,7 @@ uint8_t server_errors = 0;
  ***  FUNCTIONS                                                             ***
  *****************************************************************************/
 
- // Because blinkenlights are essential
+// Because blinkenlights are essential
 void flashLED(uint8_t led, uint8_t times, int pulseLen = 100) {
   for (uint8_t i = 0; i < times; i++) {
     digitalWrite(led, HIGH);
@@ -103,6 +107,24 @@ void flashLED(uint8_t led, uint8_t times, int pulseLen = 100) {
 // ----------------------------------------------------------------------------
 // --- MQTT FUNCTIONS                                                       ---
 // ----------------------------------------------------------------------------
+
+void checkMsg() {
+  if(new_msg) {
+    if(strcmp(last_msg.device_type, "IRCMD") == 0) {   // check it's IRCMD msg
+      // Send the received data as an IR signal. You should expand
+      // this section to suit the signals you wish to send.
+      switch (last_msg.data[PROTO]) {
+        case NEC:
+          IrSender.sendNEC(last_msg.data[ADDR], last_msg.data[CMD], 1);
+          // IrSender.sendNEC(1, 0, 1);         // FOR TESTING
+          break;
+      }
+      if (DEBUG) Serial.println(" - sent");
+      flashLED(LED_SEND_PIN, 2);                // flash to confirm
+    }
+    new_msg = false;
+  }
+}
 
 // Function to connect and reconnect as necessary to the MQTT server.
 void MQTT_connect() {
@@ -124,29 +146,19 @@ void MQTT_connect() {
 // Subscription callback
 void mqttSubCallback(char* data, uint16_t len) {
   if (len > 0) {
-    msgIn msg;
-    parseMQTTmessage(data, &msg);
+    // msgIn msg;
+    new_msg = true;
+    parseMQTTmessage(data, &last_msg);
 
     if (DEBUG) {
-      Serial.print(msg.hub_name); Serial.print(" >> ");
+      Serial.print(last_msg.device_type); Serial.print(" >> ");
       for (uint8_t i = 0; i < MSG_DATA_ITEMS; i++) {
-        Serial.print(msg.data[i]);
+        Serial.print(last_msg.data[i]);
         Serial.print(" ");
       }
       Serial.println();
       Serial.print("Sending signal");
     }
-
-    // Send the received data as an IR signal. You should expand
-    // this section to suit the signals you wish to send.
-    switch (msg.data[PROTO]) {
-      case NEC:
-        // IrSender.sendNEC(msg.data[ADDR], msg.data[CMD], 1);
-        IrSender.sendNEC(1, 0, 1);         // FOR TESTING
-        break;
-    }
-    if (DEBUG) Serial.println(" - sent");
-    flashLED(LED_SEND_PIN, 2);                // flash to confirm
   }
 }
 
@@ -156,7 +168,7 @@ void mqttSubCallback(char* data, uint16_t len) {
 bool parseMQTTmessage(char* data, msgIn* msg) {
   bool success = true;              // let's be optimistic
   // Check we actually have data and the string is not too short.
-  if (data == NULL || strlen(data) < HUBNAME_LENGTH + (MSG_DATA_ITEMS * 2)) {
+  if (data == NULL || strlen(data) < DEVTYPE_LEN + (MSG_DATA_ITEMS * 2)) {
     return false;
   }
   // Create a mutable copy of the input string because strtok
@@ -171,12 +183,12 @@ bool parseMQTTmessage(char* data, msgIn* msg) {
 
   while (token != NULL) {
     if (item_count == 0) {                    // First item: hubname string
-      if (strlen(token) != HUBNAME_LENGTH) {  // check it's the correct length
+      if (strlen(token) != DEVTYPE_LEN) {  // check it's the correct length
         success = false;
         break;
       }
-      strncpy(msg->hub_name, token, HUBNAME_LENGTH);
-      msg->hub_name[HUBNAME_LENGTH] = '\0';   // Ensure null termination
+      strncpy(msg->device_type, token, DEVTYPE_LEN);
+      msg->device_type[DEVTYPE_LEN] = '\0';   // Ensure null termination
     } else if (item_count >= 1 && item_count <= MSG_DATA_ITEMS) {
       // Remaining items: integer values
       char* endptr;
@@ -260,7 +272,7 @@ void checkIRdecode() {
       }
       char msgFmt[] = "%s_%u_%u_%u_%u_%u";
       sprintf(mqtt_msg, msgFmt,
-        HUB_NAME,
+        "IRREC",
         DEVICE_ID,
         IrReceiver.decodedIRData.protocol,
         IrReceiver.decodedIRData.address,
@@ -294,9 +306,9 @@ void processNetworkCommands(void* parameter) {
     // first connection and automatically reconnect when disconnected).  See
     // the MQTT_connect function definition above.
     MQTT_connect();
-
-    mqtt.processPackets(10000); // waits 10 secs
-
+    mqtt.processPackets(200);
+    checkMsg();
+  
     // Ping the server to keep the mqtt connection alive
     // NOT required if you are publishing once every KEEPALIVE seconds
     if (!mqtt.ping()) {
@@ -338,7 +350,6 @@ void setup() {
     // START MQTT SUBSCRIPTION
     mqtt.subscribe(&mqtt_sub);
     mqtt_sub.setCallback(mqttSubCallback);
-
 #ifdef USE_MULTITASKING
     // Set up Core 0 task
     xTaskCreatePinnedToCore(
@@ -385,10 +396,9 @@ void loop() {
   // first connection and automatically reconnect when disconnected).
   // See the MQTT_connect function definition above.
   MQTT_connect();
-
   checkIRdecode();
-
   mqtt.processPackets(200);
+  checkMsg();
 
   // Ping the server to keep the mqtt connection alive.
   // NOT required if you are publishing once every KEEPALIVE seconds
