@@ -16,8 +16,6 @@ This project consists of four variations on a theme:
 - **IR_IoT_hub_sender**: Sender-only version. Also based on an ESP8266. WORKING.
 - **IR_IoT_hub_ESP32**: Combines both sender and receiver functions. Based on an ESP32 board. You can choose at compilation time whether to use multitasking. The non-multitasking version works. The multitasking version not so much.
 
-The 'multi' branch of this repo has a work-in-progress version of `IR_IoT_hub_ESP32` that is multitasking only - and also not working. It's very experimental.
-
 ### IR remote receiver
 
 When the hub receives an IR signal from a remote, it sends it out over the network as an MQTT message using the topic `home/irrec`.
