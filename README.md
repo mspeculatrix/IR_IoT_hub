@@ -1,8 +1,8 @@
 # IR_IoT_hub
 
-This project is based on two devices, one based on an ESP32 and the other on the ESP8266.
+This project is focused around two devices, one based on an ESP32 and the other on the ESP8266.
 
-Full details are covered in articles on Machina Speculatrix (Medium subscription required).
+Full details are covered in articles on _Machina Speculatrix_ (Medium subscription required).
 
 - [_Creating an infrared IoT hub for home automation_](https://medium.com/machina-speculatrix/creating-an-infrared-iot-hub-for-home-automation-0b5cdaa3fd6f)
 - [_Infrared IoT hub: moving up to PCBs_](https://medium.com/machina-speculatrix/infrared-iot-hub-moving-up-to-pcbs-ee0eac26bd0f)
@@ -11,7 +11,7 @@ Full details are covered in articles on Machina Speculatrix (Medium subscription
 
 There are two main operations:
 
-- SENDER: Responds to an MQTT message sent across the network and emits a corrsponding IR signal.
+- SENDER: Responds to an MQTT message sent across the network and emits a corresponding IR signal.
 - RECEIVER: Responds to an IR signal (eg, from a remote) and generates a corresponding MQTT message.
 
 ## APPLICATIONS
@@ -23,9 +23,9 @@ This project consists of four variations on a theme:
 - **IR_IoT_hub_sender**: Sender-only version. Also based on an ESP8266. WORKING.
 - **IR_IoT_hub_ESP32**: Combines both sender and receiver functions. Based on an ESP32 board. You can choose at compilation time whether to use multitasking. The non-multitasking version works. The multitasking version not so much.
 
-### IR remote receiver
+### IR networked receiver
 
-When the hub receives an IR signal from a remote, it sends it out over the network as an MQTT message using the topic `home/irrec`.
+When the hub receives an IR signal from a remote, it sends it out over the network as an MQTT message using the topic `home/irrem`.
 
 The format of the message is:
 
@@ -37,12 +37,24 @@ Here's an example:
 
 The format is strict.
 
-- **device_type** - 5 chars
+- **device_type** - 5 printable ASCII chars
 - Five integer values (16-bit).
 
 ### IR networked sender
 
-When the hub picks up an MQTT message on the topic `home/ircmd` - using the same format as above - it generates a corresponding IR signal. Malformed messages will have unpredictable consequences.
+When the hub picks up an MQTT message on the topic `home/ircmd` - using the same format as above - it generates a corresponding IR signal. Malformed messages will have unpredictable and not very entertaining consequences.
+
+### IR IoT hub
+
+Combines both the above functions.
+
+## PCBs
+
+I eventually created two PCBs.
+
+One uses the ESP8266 and is intended to be used as either a sender or a receiver. If you want it to be a receiver, you simply omit the IR LED and its resistor. If you want it to be a sender, you leave off the IR sensor and its supporting passives. Alternatively, you can populate all the components and decide later if it's going to be a sender or receiver by flashing the appropriate firmware.
+
+The other PCB is for an ESP32 and is for the hub application.
 
 ## NOTES
 

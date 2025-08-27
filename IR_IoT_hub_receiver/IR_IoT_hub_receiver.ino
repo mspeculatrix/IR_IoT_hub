@@ -188,6 +188,8 @@ void loop() {
 
   if (IrReceiver.decode()) {
     if (IrReceiver.decodedIRData.decodedRawData != 0) {
+      /* This currently sends out MQTT messages for _all_ received IR
+      signals. You could choose to do some filtering here. */
       flashLED(LED_PIN, 1);
       if (DEBUG) {
         Serial.println("-----------------------");
@@ -217,7 +219,6 @@ void loop() {
   }
 
   // Ping the server to keep the mqtt connection alive.
-  // NOT required if you are publishing once every KEEPALIVE seconds
   if (!mqtt.ping()) {
     mqtt.disconnect();
   }

@@ -120,8 +120,13 @@ void mqttSubCallback(char* data, uint16_t len) {
       Serial.println();
     }
 
-    // Send the received data as an IR signal. This section probably
-    // needs expanding to cope with a wider variety of signals.
+    /** SEND THE SIGNAL *****************************************************
+    Send the received data as an IR signal.
+    This is where you decide which MQTT messages you respond to and how you
+    respond to them. The example below will emit signals for all messages
+    where the protocol is NEC (8). You'll probably want to be far more
+    specific, to manage particular devices.
+    */
     switch (msg.data[PROTO]) {
       case NEC:
         IrSender.sendNEC(msg.data[ADDR], msg.data[CMD], 1);
@@ -262,12 +267,10 @@ void loop() {
   // See the MQTT_connect function definition above.
   MQTT_connect();
 
-  // The problem with this is that it's blocking and we might miss incoming
-  // IR signals.
+
   mqtt.processPackets(200);
 
   // Ping the server to keep the mqtt connection alive.
-  // NOT required if you are publishing once every KEEPALIVE seconds
   if (!mqtt.ping()) {
     mqtt.disconnect();
   }
