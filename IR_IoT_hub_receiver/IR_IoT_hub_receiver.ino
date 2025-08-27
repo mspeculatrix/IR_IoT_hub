@@ -99,7 +99,7 @@ void MQTT_connect() {
   uint8_t retries = 3;
   while ((ret = mqtt.connect()) != 0) {   // connect() returns 0 for connected
     mqtt.disconnect();
-    delay(5000);                          // wait 5 seconds
+    flashLED(LED_PIN, 50);                // Also acts as a delay
     retries--;
     if (retries == 0) {
       while (1);                          // die and wait for WDT to reset
@@ -123,7 +123,7 @@ uint8_t wifiConnect() {
       Serial.println(ssid);
     }
     WiFi.begin(ssid, password);  // try to connect
-    delay(5000);    // delay to allow time for connection
+    flashLED(LED_PIN, 50);       // Delay to allow connection
     wifi_status = WiFi.status();
     connect_counter++;
     if (wifi_status != WL_CONNECTED) {

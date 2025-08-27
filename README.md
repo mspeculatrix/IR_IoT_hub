@@ -4,8 +4,8 @@ This project is based on two devices, one based on an ESP32 and the other on the
 
 Full details are covered in articles on Machina Speculatrix (Medium subscription required).
 
-- '[Creating an infrared IoT hub for home automation](https://medium.com/machina-speculatrix/creating-an-infrared-iot-hub-for-home-automation-0b5cdaa3fd6f)'
-- 'Infrared IoT hub: moving up to PCBs' (to come).
+- [_Creating an infrared IoT hub for home automation_](https://medium.com/machina-speculatrix/creating-an-infrared-iot-hub-for-home-automation-0b5cdaa3fd6f)
+- [_Infrared IoT hub: moving up to PCBs_](https://medium.com/machina-speculatrix/infrared-iot-hub-moving-up-to-pcbs-ee0eac26bd0f)
 
 ## OPERATIONS
 
