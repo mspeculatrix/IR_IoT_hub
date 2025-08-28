@@ -36,7 +36,7 @@
 
 /* ----- COMMON STUFF ------------------------------------------------------- */
 
-#define PUB_TOPIC "home/irrec"
+#define PUB_TOPIC "home/irrem"
 #define SUB_TOPIC "home/ircmd"
 
 #define WIFI_MAX_TRIES    12
